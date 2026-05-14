@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>简录制器 - 视频演示</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    :root {
+      --primary: #6366f1;
+      --accent: #f472b6;
+      --bg-dark: #0f0f23;
+      --bg-card: #1a1a2e;
+      --text-primary: #ffffff;
+      --text-secondary: rgba(255,255,255,0.7);
+      --text-muted: rgba(255,255,255,0.5);
+    }
+    
+    html, body { height: 100%; overflow: hidden; background: var(--bg-dark); }
+    
+    .video-container {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+    }
+    
+    /* 舞台区域 */
+    .stage {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: clamp(20px, 5vw, 60px);
+      position: relative;
+      background: linear-gradient(180deg, var(--bg-dark) 0%, #16213e 100%);
+    }
+    
+    .stage::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: 
+        radial-gradient(circle at 20% 80%, rgba(99,102,241,0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(244,114,182,0.1) 0%, transparent 50%);
+      pointer-events: none;
+    }
+    
+    .stage-content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      max-width: 1200px;
+      width: 100%;
+    }
+    
+    .stage-title {
+      font-size: clamp(1.8rem, 5vw, 3.5rem);
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: clamp(12px, 2vw, 24px);
+      background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .stage-subtitle {
+      font-size: clamp(1rem, 2.5vw, 1.4rem);
+      color: var(--text-secondary);
+      margin-bottom: clamp(20px, 4vw, 40px);
+    }
+    
+    .stage-body {
+      font-size: clamp(0.9rem, 2vw, 1.2rem);
+      line-height: 1.8;
+      color: var(--text-secondary);
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .stage-highlight {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    
+    .feature-list {
+      list-style: none;
+      padding: 0;
+      margin: clamp(20px, 4vw, 40px) auto 0;
+      max-width: 600px;
+    }
+    
+    .feature-item {
+      font-size: clamp(0.9rem, 2vw, 1.15rem);
+      color: var(--text-secondary);
+      padding: clamp(10px, 2vw, 16px) 0;
+      position: relative;
+      padding-left: clamp(24px, 5vw, 32px);
+      text-align: left;
+    }
+    
+    .feature-item::before {
+      content: '✦';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-weight: bold;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: clamp(20px, 4vw, 40px);
+      margin-top: clamp(30px, 6vw, 60px);
+    }
+    
+    .stat-item {
+      text-align: center;
+    }
+    
+    .stat-number {
+      font-size: clamp(2rem, 6vw, 3.5rem);
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    
+    .stat-label {
+      font-size: clamp(0.8rem, 1.5vw, 1rem);
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    
+    /* 字幕区域 */
+    .subtitle-area {
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(20px);
+      padding: clamp(16px, 3vw, 24px) clamp(20px, 5vw, 60px);
+      border-top: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .subtitle-text {
+      font-size: clamp(1rem, 2.5vw, 1.4rem);
+      color: var(--text-primary);
+      text-align: center;
+      line-height: 1.6;
+      min-height: clamp(40px, 8vw, 60px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.3s ease;
+    }
+    
+    .subtitle-text.active {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    .subtitle-text .highlight {
+      color: var(--accent);
+      font-weight: 500;
+    }
+    
+    /* 进度条 */
+    .progress-container {
+      background: rgba(255,255,255,0.1);
+      height: 3px;
+      margin: clamp(12px, 2vw, 16px) 0;
+      cursor: pointer;
+      border-radius: 2px;
+    }
+    
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+      border-radius: 2px;
+      transition: width 0.1s linear;
+    }
+    
+    /* 控制栏 */
+    .controls {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(16px, 3vw, 24px);
+      padding-top: clamp(8px, 1.5vw, 12px);
+    }
+    
+    .control-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      padding: clamp(8px, 2vw, 12px);
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .control-btn:hover {
+      color: var(--text-primary);
+    }
+    
+    .control-btn.play {
+      width: clamp(48px, 8vw, 64px);
+      height: clamp(48px, 8vw, 64px);
+      background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+      border-radius: 50%;
+      color: white;
+    }
+    
+    .control-btn.play:hover {
+      transform: scale(1.05);
+      box-shadow: 0 8px 24px rgba(99,102,241,0.4);
+    }
+    
+    .time-display {
+      font-size: clamp(0.85rem, 1.8vw, 1rem);
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+    
+    /* 导航面板 */
+    .nav-panel {
+      position: fixed;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(10px);
+      padding: clamp(12px, 2vw, 16px);
+      border-radius: clamp(12px, 2vw, 16px) 0 0 clamp(12px, 2vw, 16px);
+      z-index: 100;
+    }
+    
+    .nav-dots {
+      display: flex;
+      flex-direction: column;
+      gap: clamp(8px, 1.5vw, 12px);
+    }
+    
+    .nav-dot {
+      width: clamp(8px, 1.5vw, 12px);
+      height: clamp(8px, 1.5vw, 12px);
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    
+    .nav-dot.active {
+      background: var(--accent);
+      transform: scale(1.3);
+    }
+    
+    .nav-dot:hover {
+      background: rgba(255,255,255,0.6);
+    }
+    
+    /* 章节标记 */
+    .chapter-marks {
+      display: flex;
+      justify-content: space-between;
+      margin-top: clamp(8px, 1.5vw, 12px);
+      padding: 0 clamp(8px, 1.5vw, 12px);
+    }
+    
+    .chapter-mark {
+      font-size: clamp(0.7rem, 1.2vw, 0.85rem);
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+    
+    /* 动画类 */
+    .animate-fade-in {
+      animation: fadeIn 0.8s ease-out forwards;
+    }
+    
+    .animate-slide-up {
+      animation: slideUp 0.8s ease-out forwards;
+    }
+    
+    .animate-scale-in {
+      animation: scaleIn 0.6s ease-out forwards;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(clamp(20px, 4vw, 40px)); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    
+    /* 渐进式延迟 */
+    .delay-100 { animation-delay: 0.1s; }
+    .delay-200 { animation-delay: 0.2s; }
+    .delay-300 { animation-delay: 0.3s; }
+    .delay-400 { animation-delay: 0.4s; }
+    .delay-500 { animation-delay: 0.5s; }
+    
+    /* 减少动画偏好 */
+    @media (prefers-reduced-motion: reduce) {
+      * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+    }
+    
+    /* 小屏幕适配 */
+    @media (max-height: 600px) {
+      .stage { padding: clamp(15px, 3vw, 30px); }
+      .stats-grid { gap: clamp(12px, 2vw, 20px); margin-top: clamp(20px, 4vw, 30px); }
+    }
+    
+    @media (max-height: 500px) {
+      .subtitle-area { padding: clamp(12px, 2vw, 16px); }
+      .controls { gap: clamp(12px, 2vw, 16px); }
+    }
+  </style>
+</head>
+<body>
+  <div class="video-container">
+    <!-- 舞台区域 -->
+    <div class="stage" id="stage">
+      <div class="stage-content" id="stageContent">
+        <!-- 内容由JS动态填充 -->
+      </div>
+    </div>
+    
+    <!-- 字幕区域 -->
+    <div class="subtitle-area">
+      <div class="subtitle-text" id="subtitle">点击播放开始演示</div>
+      <div class="progress-container" id="progressContainer">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+      <div class="controls">
+        <button class="control-btn" id="prevBtn" title="上一章">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="19 20 9 12 19 4 19 20"/>
+            <polygon points="5 20 15 12 5 4 5 20"/>
+          </svg>
+        </button>
+        <button class="control-btn play" id="playBtn">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon id="playIcon" points="5 3 19 12 5 21 5 3"/>
+            <rect id="pauseIcon" x="6" y="4" width="4" height="16" opacity="0"/>
+            <rect id="pauseIcon2" x="14" y="4" width="4" height="16" opacity="0"/>
+          </svg>
+        </button>
+        <button class="control-btn" id="nextBtn" title="下一章">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 4 15 12 5 20 5 4"/>
+            <polygon points="19 4 9 12 19 20 19 4"/>
+          </svg>
+        </button>
+        <span class="time-display" id="timeDisplay">00:00 / 04:32</span>
+      </div>
+      <div class="chapter-marks">
+        <span class="chapter-mark">开场</span>
+        <span class="chapter-mark">痛点</span>
+        <span class="chapter-mark">功能</span>
+        <span class="chapter-mark">总结</span>
+      </div>
+    </div>
+    
+    <!-- 导航面板 -->
+    <div class="nav-panel">
+      <div class="nav-dots" id="navDots"></div>
+    </div>
+  </div>
+
+  <script>
+    // 演示数据
+    const presentationData = [
+      {
+        id: 1,
+        title: '简录制器',
+        subtitle: '把录屏流程做成工具',
+        body: '',
+        highlight: '',
+        type: 'title',
+        duration: 4500,
+        subtitleText: '大家好，今天想跟大家分享一个我最近做的小产品，叫简录制器'
+      },
+      {
+        id: 2,
+        title: '一个具体的痛点',
+        subtitle: '',
+        body: '录制教程、产品演示、软件操作讲解的时候',
+        highlight: '',
+        type: 'content',
+        duration: 3500,
+        subtitleText: '我在录制教程、产品演示、软件操作讲解的时候，经常会遇到一个很烦的流程'
+      },
+      {
+        id: 3,
+        title: '繁琐的流程',
+        subtitle: '',
+        body: '先打开录屏软件，录一段。录错了，停掉，再录一段。录完之后，还要去文件夹里找这些素材，确认哪个是第一段，哪个是第二段。',
+        highlight: '',
+        type: 'content',
+        duration: 5000,
+        subtitleText: '先打开录屏软件开始录一段，录错了停掉再录一段，录完还要去文件夹里找素材'
+      },
+      {
+        id: 4,
+        title: '核心想法',
+        subtitle: '',
+        body: '',
+        highlight: '能不能把「录制」「整理素材」「生成剪映草稿」这几步，尽量放到一个工具里完成？',
+        type: 'quote',
+        duration: 4000,
+        subtitleText: '所以我这次做简录制器，核心想法很简单：能不能把录制、整理素材、生成剪映草稿这几步，尽量放到一个工具里完成'
+      },
+      {
+        id: 5,
+        title: '为什么想做这个工具',
+        subtitle: '',
+        body: '很多时候，我不是一次性录完一整条视频。录下来的文件夹里会出现很多视频片段。手动判断顺序，导入剪映，手动排时间线。',
+        highlight: '这个过程没有什么技术含量，但特别消耗注意力',
+        type: 'content',
+        duration: 4500,
+        subtitleText: '很多时候我不是一次性录完一整条视频，文件夹里会出现很多片段，手动排序导入剪映排时间线，这个过程特别消耗注意力'
+      },
+      {
+        id: 6,
+        title: '目前已经能做什么',
+        subtitle: '',
+        body: '',
+        highlight: '',
+        type: 'features',
+        features: ['选择录制源（屏幕/窗口）', '设置录制范围（多种比例）', '音频设置（系统/麦克风）', '多段录制自动进入素材面板', '导入外部文件夹', '生成剪映草稿'],
+        duration: 5500,
+        subtitleText: '目前这个版本已经能做几件事：选择录制源、设置录制范围、音频设置、多段录制、导入文件夹、生成剪映草稿'
+      },
+      {
+        id: 7,
+        title: '一个小设计',
+        subtitle: '点击事件和智能缩放',
+        body: '录制时开启点击事件记录，软件会把点击位置和时间记录下来。生成剪映草稿时，可以利用这些点击事件，做类似智能缩放的效果。让观众看清你点在哪里。',
+        highlight: '',
+        type: 'content',
+        duration: 5000,
+        subtitleText: '这里还有一个小设计：录制的时候如果开启点击事件记录，软件会把点击位置和时间记录下来，后面生成剪映草稿时可以做智能缩放效果'
+      },
+      {
+        id: 8,
+        title: '为什么没有追求全自动',
+        subtitle: '',
+        body: '之前研究过自动生成：文章生成画面、视频、剪辑。但我的场景不太一样，我的视频是发声渠道，是在表达观点。',
+        highlight: '有些内容，还是得我亲自说',
+        type: 'content',
+        duration: 4500,
+        subtitleText: '我之前一直在研究自动生成，但后来发现我的场景不太一样，我的视频是我的发声渠道，有些内容还是得我亲自说'
+      },
+      {
+        id: 9,
+        title: '核心观点',
+        subtitle: '',
+        body: '',
+        highlight: '我不是想做一个替我表达的工具，而是想做一个让我更容易表达的工具',
+        type: 'quote',
+        duration: 4000,
+        subtitleText: '核心观点可以浓缩成一句话：我不是想做一个替我表达的工具，而是想做一个让我更容易表达的工具'
+      },
+      {
+        id: 10,
+        title: '总结',
+        subtitle: '',
+        body: '简录制器不是一个大而全的软件，它是我把自己的录屏流程做成的小工具。',
+        highlight: '不要让工具替我表达，而是让工具减少表达前后的阻力',
+        type: 'content',
+        duration: 4500,
+        subtitleText: '总结一下：简录制器不是一个大而全的软件，它是我把自己的录屏流程做成的一个小工具'
+      },
+      {
+        id: 11,
+        title: '感谢观看',
+        subtitle: '欢迎试用 & 交流',
+        body: '',
+        highlight: '',
+        type: 'title',
+        duration: 3000,
+        subtitleText: '感谢观看，欢迎在评论区交流，我们下期见'
+      }
+    ];
+
+    // DOM元素
+    const stageContent = document.getElementById('stageContent');
+    const subtitleEl = document.getElementById('subtitle');
+    const progressBar = document.getElementById('progressBar');
+    const progressContainer = document.getElementById('progressContainer');
+    const playBtn = document.getElementById('playBtn');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const timeDisplay = document.getElementById('timeDisplay');
+    const navDots = document.getElementById('navDots');
+
+    // 状态
+    let currentIndex = 0;
+    let isPlaying = false;
+    let startTime = 0;
+    let currentTimer = null;
+    let totalDuration = presentationData.reduce((sum, item) => sum + item.duration, 0);
+
+    // 初始化导航点
+    function initNavDots() {
+      presentationData.forEach((_, index) => {
+        const dot = document.createElement('div');
+        dot.className = 'nav-dot' + (index === 0 ? ' active' : '');
+        dot.addEventListener('click', () => goToSlide(index));
+        navDots.appendChild(dot);
+      });
+    }
+
+    // 渲染当前幻灯片
+    function renderSlide(index) {
+      const data = presentationData[index];
+      let html = '';
+
+      switch(data.type) {
+        case 'title':
+          html = `
+            <div class="stage-title animate-fade-in">${data.title}</div>
+            ${data.subtitle ? `<div class="stage-subtitle animate-slide-up delay-200">${data.subtitle}</div>` : ''}
+          `;
+          break;
+        case 'content':
+          html = `
+            <div class="stage-title animate-fade-in">${data.title}</div>
+            <div class="stage-body animate-slide-up delay-200">${data.body}</div>
+            ${data.highlight ? `<div class="stage-body animate-slide-up delay-300"><span class="stage-highlight">${data.highlight}</span></div>` : ''}
+          `;
+          break;
+        case 'quote':
+          html = `
+            <div class="stage-title animate-fade-in">${data.title}</div>
+            <div class="stage-body animate-slide-up delay-200" style="font-style: italic; font-size: clamp(1rem, 2.5vw, 1.5rem); padding: 20px; background: rgba(255,255,255,0.05); border-left: 4px solid #f472b6;">${data.highlight}</div>
+          `;
+          break;
+        case 'features':
+          html = `
+            <div class="stage-title animate-fade-in">${data.title}</div>
+            <ul class="feature-list">
+              ${data.features.map((feature, i) => `<li class="feature-item animate-slide-up" style="animation-delay: ${0.15 * i + 0.2}s">${feature}</li>`).join('')}
+            </ul>
+          `;
+          break;
+      }
+
+      stageContent.innerHTML = html;
+      updateNavDots(index);
+    }
+
+    // 更新导航点
+    function updateNavDots(index) {
+      document.querySelectorAll('.nav-dot').forEach((dot, i) => {
+        dot.classList.toggle('active', i === index);
+      });
+    }
+
+    // 更新字幕
+    function updateSubtitle(text) {
+      subtitleEl.classList.remove('active');
+      setTimeout(() => {
+        subtitleEl.textContent = text;
+        subtitleEl.classList.add('active');
+      }, 150);
+    }
+
+    // 更新进度
+    function updateProgress(elapsed) {
+      const progress = (elapsed / totalDuration) * 100;
+      progressBar.style.width = progress + '%';
+      
+      const currentTime = formatTime(elapsed);
+      const totalTime = formatTime(totalDuration);
+      timeDisplay.textContent = `${currentTime} / ${totalTime}`;
+    }
+
+    // 格式化时间
+    function formatTime(ms) {
+      const seconds = Math.floor(ms / 1000);
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    // 播放逻辑
+    function play() {
+      if (isPlaying) return;
+      isPlaying = true;
+      startTime = performance.now() - getCurrentElapsed();
+      updatePlayIcon(true);
+      playCurrentSlide();
+    }
+
+    function pause() {
+      isPlaying = false;
+      updatePlayIcon(false);
+      if (currentTimer) {
+        clearTimeout(currentTimer);
+        currentTimer = null;
+      }
+    }
+
+    function togglePlay() {
+      if (isPlaying) {
+        pause();
+      } else {
+        play();
+      }
+    }
+
+    function updatePlayIcon(isPlaying) {
+      document.getElementById('playIcon').style.opacity = isPlaying ? '0' : '1';
+      document.getElementById('pauseIcon').style.opacity = isPlaying ? '1' : '0';
+      document.getElementById('pauseIcon2').style.opacity = isPlaying ? '1' : '0';
+    }
+
+    function playCurrentSlide() {
+      const data = presentationData[currentIndex];
+      updateSubtitle(data.subtitleText);
+      renderSlide(currentIndex);
+
+      currentTimer = setTimeout(() => {
+        if (currentIndex < presentationData.length - 1) {
+          currentIndex++;
+          playCurrentSlide();
+        } else {
+          // 播放完毕
+          pause();
+        }
+      }, data.duration);
+    }
+
+    function getCurrentElapsed() {
+      let elapsed = 0;
+      for (let i = 0; i < currentIndex; i++) {
+        elapsed += presentationData[i].duration;
+      }
+      if (isPlaying && startTime) {
+        elapsed += performance.now() - startTime;
+      }
+      return elapsed;
+    }
+
+    function goToSlide(index) {
+      if (index < 0 || index >= presentationData.length) return;
+      pause();
+      currentIndex = index;
+      updateProgress(getCurrentElapsed());
+      renderSlide(index);
+      updateSubtitle(presentationData[index].subtitleText);
+    }
+
+    function prevSlide() {
+      goToSlide(currentIndex - 1);
+    }
+
+    function nextSlide() {
+      goToSlide(currentIndex + 1);
+    }
+
+    // 进度条点击
+    progressContainer.addEventListener('click', (e) => {
+      const rect = progressContainer.getBoundingClientRect();
+      const percent = (e.clientX - rect.left) / rect.width;
+      const targetElapsed = percent * totalDuration;
+      
+      // 找到对应的幻灯片
+      let elapsed = 0;
+      for (let i = 0; i < presentationData.length; i++) {
+        elapsed += presentationData[i].duration;
+        if (elapsed >= targetElapsed) {
+          goToSlide(i);
+          return;
+        }
+      }
+      goToSlide(presentationData.length - 1);
+    });
+
+    // 键盘事件
+    document.addEventListener('keydown', (e) => {
+      switch(e.key) {
+        case ' ':
+          e.preventDefault();
+          togglePlay();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          prevSlide();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          nextSlide();
+          break;
+        case 'ArrowUp':
+        case 'ArrowDown':
+          e.preventDefault();
+          break;
+      }
+    });
+
+    // 定时更新进度（用于播放时）
+    function scheduleProgressUpdate() {
+      if (isPlaying) {
+        updateProgress(getCurrentElapsed());
+        requestAnimationFrame(scheduleProgressUpdate);
+      }
+    }
+
+    // 按钮事件
+    playBtn.addEventListener('click', togglePlay);
+    prevBtn.addEventListener('click', prevSlide);
+    nextBtn.addEventListener('click', nextSlide);
+
+    // 开始播放时启动进度更新
+    playBtn.addEventListener('click', () => {
+      if (isPlaying) {
+        scheduleProgressUpdate();
+      }
+    });
+
+    // 初始化
+    initNavDots();
+    renderSlide(0);
+    updateSubtitle('点击播放开始演示');
+    updateProgress(0);
+  </script>
+</body>
+</html>

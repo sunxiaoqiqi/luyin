@@ -1,0 +1,216 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>简录制器</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div>
+        <h1>简录制器</h1>
+        <p id="statusText">准备录制</p>
+      </div>
+      <div class="header-actions">
+        <button id="refreshSourcesBtn" class="ghost-button">刷新源</button>
+        <button id="settingsBtn" class="ghost-button">设置</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="recorder-panel">
+        <div class="control-grid">
+          <label>
+            <span>录制模式</span>
+            <select id="modeSelect">
+              <option value="normal">普通录制</option>
+              <option value="multi">多段录制</option>
+            </select>
+          </label>
+          <label>
+            <span>录制源</span>
+            <select id="sourceSelect"></select>
+          </label>
+          <label>
+            <span>音频</span>
+            <select id="audioSelect">
+              <option value="system-mic">系统声音 + 麦克风</option>
+              <option value="system">系统声音</option>
+              <option value="mic">麦克风</option>
+              <option value="silent">静音</option>
+            </select>
+          </label>
+          <label>
+            <span>画质</span>
+            <select id="qualitySelect">
+              <option value="1080p-30">1080p / 30fps</option>
+              <option value="1080p-60">1080p / 60fps</option>
+              <option value="720p-30">720p / 30fps</option>
+              <option value="original-30">原始 / 30fps</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="path-row">
+          <div>
+            <span class="label">保存位置</span>
+            <strong id="saveDirText">加载中...</strong>
+          </div>
+          <div class="path-actions">
+            <button id="chooseSaveDirBtn" class="ghost-button">更改目录</button>
+            <button id="openSaveDirBtn" class="ghost-button">打开</button>
+          </div>
+        </div>
+
+        <section class="range-section">
+          <div class="section-title">
+            <h2>录制范围</h2>
+            <button id="setDefaultRangeBtn" class="ghost-button">设为默认</button>
+          </div>
+          <div id="rangePresets" class="range-grid"></div>
+          <div id="customAreaForm" class="custom-area hidden">
+            <label>X <input id="customX" type="number" min="0" value="0"></label>
+            <label>Y <input id="customY" type="number" min="0" value="0"></label>
+            <label>宽 <input id="customWidth" type="number" min="1" value="1920"></label>
+            <label>高 <input id="customHeight" type="number" min="1" value="1080"></label>
+          </div>
+        </section>
+
+        <section class="preview-card">
+          <div class="preview-toolbar">
+            <div>
+              <span class="label">当前预览</span>
+              <strong id="sourceNameText">未选择录制源</strong>
+            </div>
+            <span id="timerText" class="timer">00:00:00</span>
+          </div>
+          <div class="preview-stage">
+            <img id="sourceThumbnail" alt="录制源缩略图">
+            <video id="previewVideo" autoplay muted playsinline></video>
+            <div id="cropFrame" class="crop-frame">
+              <span class="crop-label">录制范围</span>
+              <span class="resize-handle nw" data-resize="nw"></span>
+              <span class="resize-handle ne" data-resize="ne"></span>
+              <span class="resize-handle sw" data-resize="sw"></span>
+              <span class="resize-handle se" data-resize="se"></span>
+            </div>
+            <canvas id="recordCanvas" class="hidden"></canvas>
+          </div>
+        </section>
+
+        <div class="record-actions">
+          <button id="startBtn" class="primary-button">开始录制</button>
+          <button id="pauseBtn" class="secondary-button" disabled>暂停</button>
+          <button id="stopBtn" class="danger-button" disabled>停止录制</button>
+          <button id="cancelBtn" class="ghost-button" disabled>取消本次</button>
+        </div>
+      </section>
+
+      <aside class="segments-panel">
+        <div class="section-title">
+          <div>
+            <h2>素材面板</h2>
+            <p id="projectSummary">片段 0 个，总时长 00:00:00</p>
+          </div>
+          <input id="projectNameInput" value="未命名项目" aria-label="项目名称">
+        </div>
+
+        <div id="segmentsList" class="segments-list empty">
+          <div class="empty-state">
+            <strong>还没有录制片段</strong>
+            <span>切换到多段录制后，停止录制的片段会出现在这里。</span>
+          </div>
+        </div>
+
+        <div class="segments-actions">
+          <button id="importFolderBtn" class="secondary-button">导入文件夹</button>
+          <button id="mergeBtn" class="secondary-button" disabled>合并导出</button>
+          <button id="draftBtn" class="primary-button" disabled>生成剪映草稿</button>
+          <button id="cleanDraftBtn" class="secondary-button" disabled>去口癖生成草稿</button>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <dialog id="resultDialog">
+    <form method="dialog" class="dialog-content">
+      <h2 id="resultTitle">录制完成</h2>
+      <p id="resultBody"></p>
+      <menu>
+        <button id="resultOpenBtn" value="open" class="secondary-button">打开位置</button>
+        <button value="close" class="primary-button">知道了</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" class="dialog-content settings-dialog">
+      <h2>设置</h2>
+
+      <section class="settings-section">
+        <h3>基础设置</h3>
+        <div class="settings-row">
+          <label>
+            <span>默认保存位置</span>
+            <input id="settingsSaveDir" readonly>
+          </label>
+          <button id="settingsSaveDirBtn" type="button" class="ghost-button">更改</button>
+        </div>
+        <div class="settings-row">
+          <label>
+            <span>剪映草稿目录</span>
+            <input id="settingsDraftDir" readonly>
+          </label>
+          <button id="settingsDraftDirBtn" type="button" class="ghost-button">更改</button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>默认录制</h3>
+        <div class="settings-grid">
+          <label>
+            <span>默认音频</span>
+            <select id="settingsAudio">
+              <option value="system-mic">系统声音 + 麦克风</option>
+              <option value="system">系统声音</option>
+              <option value="mic">麦克风</option>
+              <option value="silent">静音</option>
+            </select>
+          </label>
+          <label>
+            <span>默认画质</span>
+            <select id="settingsQuality">
+              <option value="1080p-30">1080p / 30fps</option>
+              <option value="1080p-60">1080p / 60fps</option>
+              <option value="720p-30">720p / 30fps</option>
+              <option value="original-30">原始 / 30fps</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>事件记录</h3>
+        <label class="checkbox-row">
+          <input id="settingsRecordClicks" type="checkbox">
+          <span>记录点击事件并生成同名 _events.json</span>
+        </label>
+        <label class="checkbox-row">
+          <input id="settingsRecordMousePath" type="checkbox">
+          <span>记录鼠标移动轨迹（当前版本暂作为配置保留）</span>
+        </label>
+      </section>
+
+      <menu>
+        <button value="close" class="ghost-button">取消</button>
+        <button id="settingsSaveBtn" value="save" class="primary-button">保存设置</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <script src="./renderer.js"></script>
+</body>
+</html>
+
